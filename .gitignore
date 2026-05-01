@@ -2,3 +2,7 @@ auth.env
 __pycache__/
 *.py[cod]
 .codex
+Grounded-Segment-Anything
+hamer
+recognize-anything
+Video-Depth-Anything
