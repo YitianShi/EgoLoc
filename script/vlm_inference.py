@@ -55,6 +55,41 @@ def extract_frame_info(response: str) -> int:
         return -1
 
 
+def _credential_value(credentials: Dict[str, Any], key: str) -> str:
+    value = credentials.get(key, "")
+    return value.strip() if isinstance(value, str) else str(value).strip()
+
+
+def _build_vlm_client(credentials: Dict[str, Any]) -> Tuple[Any, Dict[str, Any]]:
+    azure_key = _credential_value(credentials, "AZURE_OPENAI_API_KEY")
+    if azure_key:
+        azure_endpoint = _credential_value(credentials, "AZURE_OPENAI_ENDPOINT")
+        azure_deployment = _credential_value(credentials, "AZURE_OPENAI_DEPLOYMENT_NAME")
+        if not azure_endpoint:
+            raise RuntimeError("AZURE_OPENAI_ENDPOINT is required when AZURE_OPENAI_API_KEY is set.")
+        if not azure_deployment:
+            raise RuntimeError("AZURE_OPENAI_DEPLOYMENT_NAME is required when AZURE_OPENAI_API_KEY is set.")
+        return AzureOpenAI(
+            api_version="2024-02-01",
+            azure_endpoint=azure_endpoint,
+            api_key=azure_key
+        ), {"model": azure_deployment}
+
+    api_key = _credential_value(credentials, "OPENAI_API_KEY")
+    if not api_key:
+        credentials_path = _credential_value(credentials, "_CREDENTIALS_PATH") or "auth.env"
+        raise RuntimeError(
+            "OPENAI_API_KEY is empty. Set it in the environment or in "
+            f"{credentials_path}, or configure Azure OpenAI credentials."
+        )
+
+    model = _credential_value(credentials, "OPENAI_MODEL") or "gpt-4o"
+    base_url = _credential_value(credentials, "OPENAI_BASE_URL")
+    if base_url:
+        return OpenAI(api_key=api_key, base_url=base_url), {"model": model}
+    return OpenAI(api_key=api_key), {"model": model}
+
+
 def scene_understanding(
     credentials: Dict[str, Any],
     frame: np.ndarray,
@@ -113,31 +148,13 @@ def scene_understanding(
     messages = [{"role": "user", "content": content}]
     
     # Setup client
-    if credentials.get("AZURE_OPENAI_API_KEY"):
-        client = AzureOpenAI(
-            api_version="2024-02-01",
-            azure_endpoint=credentials["AZURE_OPENAI_ENDPOINT"],
-            api_key=credentials["AZURE_OPENAI_API_KEY"]
-        )
-        params = {
-            "model": credentials.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o"),
-            "messages": messages,
-            "max_tokens": Config.MAX_TOKENS,
-            "temperature": Config.TEMPERATURE,
-            "top_p": Config.TOP_P
-        }
-    else:
-        client = OpenAI(
-            api_key=credentials["OPENAI_API_KEY"],
-            base_url="https://api.chatanywhere.tech/v1"
-        )
-        params = {
-            "model": "gpt-4o",
-            "messages": messages,
-            "max_tokens": Config.MAX_TOKENS,
-            "temperature": Config.TEMPERATURE,
-            "top_p": Config.TOP_P
-        }
+    client, params = _build_vlm_client(credentials)
+    params.update({
+        "messages": messages,
+        "max_tokens": Config.MAX_TOKENS,
+        "temperature": Config.TEMPERATURE,
+        "top_p": Config.TOP_P
+    })
     
     # Call API with retries
     count = 0
@@ -155,7 +172,15 @@ def scene_understanding(
                     continue
             
             break
-        except (openai.RateLimitError, openai.APIStatusError) as e:
+        except openai.AuthenticationError as e:
+            raise RuntimeError("[VLM] Authentication failed. Check OPENAI_API_KEY/AZURE_OPENAI_API_KEY.") from e
+        except openai.RateLimitError as e:
+            print(f"[VLM] API error: {e}, retrying...")
+            time.sleep(2)
+            count += 1
+        except openai.APIStatusError as e:
+            if e.status_code in (401, 403):
+                raise RuntimeError("[VLM] Authentication failed. Check OPENAI_API_KEY/AZURE_OPENAI_API_KEY.") from e
             print(f"[VLM] API error: {e}, retrying...")
             time.sleep(2)
             count += 1
@@ -288,4 +313,3 @@ If a separation moment is detected:
 If no separation is detected:
 "Frame: -1"
 """
-

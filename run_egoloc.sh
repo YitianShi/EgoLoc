@@ -1,8 +1,8 @@
 export CUDA_VISIBLE_DEVICES=0
 
 python egoloc_2D_demo.py \
-  --video_path ~/output.mp4 \
-  --output_dir ~/my_output \
+  --video_path ./video1.mp4 \
+  --output_dir output \
   --config Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py \
   --grounded_checkpoint Grounded-Segment-Anything/groundingdino_swint_ogc.pth \
   --sam_checkpoint Grounded-Segment-Anything/sam_vit_h_4b8939.pth \

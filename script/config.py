@@ -6,6 +6,25 @@ from typing import Optional, Dict, Any
 import os
 
 
+def _load_dotenv_values(env_file: Path) -> Dict[str, Any]:
+    try:
+        import dotenv
+    except ImportError:
+        if not env_file.exists():
+            return {}
+
+        values = {}
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip("\"'")
+        return values
+
+    return dict(dotenv.dotenv_values(env_file))
+
+
 class Config:
     """Centralized configuration for EgoLoc3D pipeline"""
     
@@ -84,15 +103,40 @@ class Config:
     
     @classmethod
     def load_credentials(cls, env_path: str) -> Dict[str, Any]:
-        """Load API credentials from .env file"""
-        import dotenv
-        creds = dotenv.dotenv_values(env_path)
+        """Load API credentials from environment variables and a .env file."""
+        env_file = Path(env_path).expanduser()
+        if not env_file.is_absolute():
+            cwd_env_file = Path.cwd() / env_file
+            repo_env_file = cls.find_repo_root() / env_file
+            env_file = cwd_env_file if cwd_env_file.exists() else repo_env_file
+
+        creds = _load_dotenv_values(env_file)
+
+        for key in (
+            "OPENAI_API_KEY",
+            "OPENAI_BASE_URL",
+            "OPENAI_MODEL",
+            "AZURE_OPENAI_API_KEY",
+            "AZURE_OPENAI_ENDPOINT",
+            "AZURE_OPENAI_DEPLOYMENT_NAME",
+        ):
+            env_value = os.environ.get(key)
+            if env_value:
+                creds[key] = env_value
         
         # Ensure required keys exist (with empty strings as defaults)
-        required = ["OPENAI_API_KEY", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT_NAME"]
+        required = [
+            "OPENAI_API_KEY",
+            "OPENAI_BASE_URL",
+            "OPENAI_MODEL",
+            "AZURE_OPENAI_API_KEY",
+            "AZURE_OPENAI_ENDPOINT",
+            "AZURE_OPENAI_DEPLOYMENT_NAME",
+        ]
         for key in required:
-            if key not in creds:
+            if not creds.get(key):
                 creds[key] = ""
+
+        creds["_CREDENTIALS_PATH"] = str(env_file)
         
         return creds
-
