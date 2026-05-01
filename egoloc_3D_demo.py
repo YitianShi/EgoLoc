@@ -219,8 +219,7 @@ def scene_understanding(credentials: Dict[str, Any], frame: np.ndarray, prompt: 
         from openai import OpenAI
 
         client = OpenAI(
-            api_key=credentials["OPENAI_API_KEY"],
-            base_url="https://api.chatanywhere.tech/v1",
+            api_key=credentials["OPENAI_API_KEY"]
         )
         params = {"model": "gpt-4o"}
 
@@ -898,7 +897,7 @@ def extract_3d_speed_and_visualize(video_path: str, output_dir: str, *, device: 
         generate_depth_video_vda(video_path, depth_dir, device=device, encoder=encoder)
     else:
         print("[3D‑Pipeline] Reusing cached depth outputs in", depth_dir)
-    
+
     # ── depth quality check  +  auto-repair  ───────────────────────────────
     max_repairs = 5          # keeps run-time bounded
     for attempt in range(max_repairs):
@@ -1035,50 +1034,71 @@ def extract_3d_speed_and_visualize(video_path: str, output_dir: str, *, device: 
 # ---------------------------------------------------------------------------
 # Point Cloud Generation
 # ---------------------------------------------------------------------------
-def _generate_pointclouds(depth_dir: Path,  video_path: str, pcd_out_dir: Path, intrinsics: Optional[Tuple[float,float,float,float]] = None):
+def _generate_pointclouds(depth_dir: Path, video_path: str, pcd_out_dir: Path, intrinsics: Optional[Tuple[float,float,float,float]] = None):
     """
     Create a coloured .ply point cloud for every frame whose depth tensor exists.
-      • depth_dir   : folder with pred_depth_000000.npy … (metres)
-      • video_path  : original RGB video (to grab colours)
-      • pcd_out_dir : output <idx>.ply files
     """
     pcd_out_dir.mkdir(parents=True, exist_ok=True)
     cap = cv2.VideoCapture(video_path)
-    H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    if intrinsics is None:
-        fx = fy = max(H, W)          # <-- quick default; replace with calibrated fx,fy
-        cx, cy = W / 2.0, H / 2.0
-    else:
-        fx, fy, cx, cy = intrinsics
 
-    intrinsic = o3d.camera.PinholeCameraIntrinsic()
-    intrinsic.set_intrinsics(W, H, fx, fy, cx, cy)
+    # 获取原始视频分辨率
+    orig_H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    orig_W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
     depth_files = sorted(depth_dir.glob("pred_depth_*.npy"))
+
     for dfile in depth_files:
         idx = int(dfile.stem.split("_")[-1])
-        # grab colour frame
+
+        # 1. 加载深度图
+        depth_m = _load_depth(depth_dir, idx)
+        if depth_m is None:
+            continue
+
+        # 获取当前深度图的实际尺寸 (可能是 1280x960)
+        dH, dW = depth_m.shape[:2]
+
+        # 2. 读取 RGB 帧
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ok, frame_bgr = cap.read()
         if not ok:
             continue
-        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        depth_m = _load_depth(depth_dir, idx)      # **same     depth   maths** everywhere
-        if depth_m is None:
-            continue
 
-        # Open3D expects depth in millimetres by default (depth_scale=1000)
+        # 3. 强制缩放 RGB 以匹配深度图尺寸
+        if (orig_W != dW) or (orig_H != dH):
+            # 使用线性插值将 1440x1080 缩放到 1280x960
+            frame_bgr = cv2.resize(frame_bgr, (dW, dH), interpolation=cv2.INTER_LINEAR)
+
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+
+        # 4. 动态设置内参 (Intrinsics 也需要根据当前尺寸调整)
+        if intrinsics is None:
+            # 如果没有提供内参，根据当前缩放后的 W, H 计算默认值
+            fx = fy = max(dH, dW)
+            cx, cy = dW / 2.0, dH / 2.0
+        else:
+            # 如果提供了内参，需要按比例缩放内参系数
+            orig_fx, orig_fy, orig_cx, orig_cy = intrinsics
+            fx = orig_fx * (dW / orig_W)
+            fy = orig_fy * (dH / orig_H)
+            cx = orig_cx * (dW / orig_W)
+            cy = orig_cy * (dH / orig_H)
+
+        intrinsic = o3d.camera.PinholeCameraIntrinsic()
+        intrinsic.set_intrinsics(dW, dH, fx, fy, cx, cy)
+
+        # 5. 转换为 Open3D 格式并保存
         depth_o3d = o3d.geometry.Image((depth_m * 1000).astype(np.uint16))
         color_o3d = o3d.geometry.Image(frame_rgb)
+
         rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
             color_o3d, depth_o3d, depth_scale=1000.0,
             depth_trunc=4.0, convert_rgb_to_intensity=False
         )
+
         pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsic)
-        # flip to keep +Z forward, +Y up (matches your earlier flip in register func)
-#       pcd.transform([[1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,1]]) # < --------------------------
         o3d.io.write_point_cloud(str(pcd_out_dir / f"{idx}.ply"), pcd, write_ascii=False)
+
     cap.release()
     print(f"[PCD] Generated {len(depth_files)} point clouds in {pcd_out_dir}")
 
@@ -1166,14 +1186,14 @@ def visualize_frame(video_path: str, idx: int, out_path: str, label: Optional[st
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser("EgoLoc 3-D Demo (lite edition)")
-    parser.add_argument("--video_path", required=True, help="Input video")
+    parser.add_argument("--video_path", default="/home/zicheng/output.mp4", help="Input video")
     parser.add_argument(
         "--action", default="Grasping the object", help="Action label shown to GPT-4o"
     )
     parser.add_argument(
         "--grid_size", type=int, default=3, help="Grid size for numbered frame grids"
     )
-    parser.add_argument("--output_dir", default="output", help="Output folder")
+    parser.add_argument("--output_dir", default="/home/zicheng/my_3d_output", help="Output folder")
     parser.add_argument(
         "--device",
         default="cuda",
@@ -1181,7 +1201,7 @@ def main():
         help="Computation device",
     )
     parser.add_argument(
-        "--credentials", required=True, help="Path to .env with OpenAI / Azure keys"
+        "--credentials", default="auth.env", help="Path to .env with OpenAI / Azure keys"
     )
     parser.add_argument(
         "--encoder",

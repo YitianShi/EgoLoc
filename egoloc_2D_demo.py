@@ -15,10 +15,12 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+EGOLOC_ROOT = os.path.dirname(os.path.abspath(__file__))
+VLM_INPUT_DIR = None
 
-sys.path.insert(0, os.path.join(os.getcwd(), "Grounded-Segment-Anything/GroundingDINO"))
-sys.path.insert(0, os.path.join(os.getcwd(), "Grounded-Segment-Anything"))
-sys.path.append(os.path.join(os.getcwd(), "Grounded-Segment-Anything/segment_anything"))
+sys.path.insert(0, os.path.join(EGOLOC_ROOT, "Grounded-Segment-Anything/GroundingDINO"))
+sys.path.insert(0, os.path.join(EGOLOC_ROOT, "Grounded-Segment-Anything"))
+sys.path.append(os.path.join(EGOLOC_ROOT, "Grounded-Segment-Anything/segment_anything"))
 
 
 import GroundingDINO.groundingdino.datasets.transforms as T
@@ -27,6 +29,25 @@ from GroundingDINO.groundingdino.models import build_model
 from GroundingDINO.groundingdino.util.slconfig import SLConfig
 from GroundingDINO.groundingdino.util.utils import clean_state_dict, get_phrases_from_posmap
 from segment_anything.segment_anything import sam_model_registry, SamPredictor
+
+
+def resolve_egoloc_path(path):
+    """Resolve EgoLoc asset paths relative to this file, not the caller cwd."""
+    if path is None or os.path.isabs(path):
+        return path
+    return os.path.join(EGOLOC_ROOT, path)
+
+
+def default_video_path():
+    data_root = os.environ.get("DATA_ROOT", os.path.join(os.path.expanduser("~"), "Datasets/HOMimic_recorded_data"))
+    return os.environ.get("VIDEO_PATH", os.path.join(data_root, "1", "camera_static.mp4"))
+
+
+def default_output_dir(video_path):
+    video_dir = os.path.dirname(os.path.abspath(video_path))
+    if os.path.basename(video_path) == os.environ.get("CAMERA_VIDEO", "camera_static.mp4"):
+        return os.path.join(video_dir, "egoloc")
+    return os.path.join(video_dir, "egoloc_output")
 
 def load_model(model_config_path, model_checkpoint_path, bert_base_uncased_path, device):
     """
@@ -54,6 +75,7 @@ def load_model(model_config_path, model_checkpoint_path, bert_base_uncased_path,
     model = build_model(args)
     checkpoint = torch.load(model_checkpoint_path, map_location="cpu")
     model.load_state_dict(clean_state_dict(checkpoint["model"]), strict=False)
+    model = model.to(device)
     model.eval()
     return model
 
@@ -100,7 +122,6 @@ def get_grounding_output(model, image, caption, box_threshold, text_threshold, d
     caption = caption.lower().strip()
     if not caption.endswith("."):
         caption = caption + "."
-    model = model.to(device)
     image = image.to(device)
     with torch.no_grad():
         outputs = model(image[None], captions=[caption])
@@ -545,7 +566,7 @@ def process_task(
         says the action is not present (-1 in its JSON response).
     """
     prompt_start = (
-        f"I will show an image sequence of human cooking. "
+        f"I will show an image sequence of human grasping. "
         f"I have annotated the images with numbered circles. "
         f"Choose the number that is closest to the moment when the ({action}) has started. "
         f"You are a five-time world champion in this game. "
@@ -555,7 +576,7 @@ def process_task(
     )
 
     prompt_end = (
-        f"I will show an image sequence of human cooking. "
+        f"I will show an image sequence of human grasping. "
         f"I have annotated the images with numbered circles. "
         f"Choose the number that is closest to the moment when the ({action}) has ended. "
         f"You are a five-time world champion in this game. "
@@ -868,6 +889,12 @@ def scene_understanding(credentials, frame, prompt_message, flag=None):
             • Otherwise: the full text response.
     """
     frame = image_resize_for_vlm(frame)
+
+    vlm_input_dir = VLM_INPUT_DIR or os.path.join(EGOLOC_ROOT, "vlm_inputs")
+    os.makedirs(vlm_input_dir, exist_ok=True)
+    save_path = os.path.join(vlm_input_dir, f"vlm{int(time.time()*1000)}.jpg")
+    cv2.imwrite(save_path, frame)
+
     _, buffer = cv2.imencode(".jpg", frame)
     base64Frame = base64.b64encode(buffer).decode("utf-8")
     PROMPT_MESSAGES = [
@@ -889,41 +916,24 @@ def scene_understanding(credentials, frame, prompt_message, flag=None):
         },
     ]
     import openai
-    if "AZURE_OPENAI_API_KEY" in credentials and len(credentials["AZURE_OPENAI_API_KEY"]) > 0:
-        from openai import AzureOpenAI
-        client_gpt4v = AzureOpenAI(
-            api_version="2024-02-01",
-            azure_endpoint=credentials["AZURE_OPENAI_ENDPOINT"],
-            api_key=credentials["AZURE_OPENAI_API_KEY"]
-        )
-        params = {
-            "model": credentials["AZURE_OPENAI_DEPLOYMENT_NAME"],
-            "messages": PROMPT_MESSAGES,
-            "max_tokens": 200,
-            "temperature": 0.1,
-            "top_p": 0.5,
-            "frequency_penalty": 0.0,
-            "presence_penalty": 0.0,
-        }
-    else:
-        from openai import OpenAI
-        client_gpt4v = OpenAI(
-            api_key=credentials["OPENAI_API_KEY"],
-            base_url="https://api.chatanywhere.tech/v1"
-        )
-        params = {
-            "model": "gpt-4o",
-            "messages": PROMPT_MESSAGES,
-            "max_tokens": 200,
-            "temperature": 0.1,
-            "top_p": 0.5,
-            "frequency_penalty": 0.0,
-            "presence_penalty": 0.0,
-        }
+    from openai import OpenAI
+    client_gpt4v = OpenAI(
+        api_key=credentials["OPENAI_API_KEY"]
+    )
+    params = {
+        "model": "gpt-4o",
+        "messages": PROMPT_MESSAGES,
+        "max_tokens": 200,
+        "temperature": 0.1,
+        "top_p": 0.5,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+    }
+
     count = 0
     while True:
         if count > 5:
-            raise Exception("Failed to get response from Azure OpenAI")
+            raise Exception("Failed to get response from OpenAI")
         try:
             result = client_gpt4v.chat.completions.create(**params)
             break
@@ -1183,21 +1193,33 @@ def create_frame_grid_with_keyframe(video_path, frame_indices, grid_size):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("EgoLoc 2D Feedback Demo")
-    parser.add_argument("--video_path", type=str, required=True, help="Path to input video")
-    parser.add_argument("--output_dir", type=str, required=False, default="output", help="Output directory")
-    parser.add_argument("--config", type=str, required=True, help="GroundingDINO config file")
-    parser.add_argument("--grounded_checkpoint", type=str, required=True, help="GroundingDINO checkpoint")
-    parser.add_argument("--sam_checkpoint", type=str, required=True, help="SAM checkpoint")
-    parser.add_argument("--bert_base_uncased_path", type=str, required=True, help="bert-base-uncased path")
+    parser.add_argument("--video_path", type=str, default=default_video_path(), help="Path to input video")
+    parser.add_argument("--output_dir", type=str, required=False, default=None, help="Output directory")
+    parser.add_argument("--config", type=str, default="Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py", help="GroundingDINO config file")
+    parser.add_argument("--grounded_checkpoint", type=str, default="Grounded-Segment-Anything/groundingdino_swint_ogc.pth", help="GroundingDINO checkpoint")
+    parser.add_argument("--sam_checkpoint", type=str, default="Grounded-Segment-Anything/sam_vit_h_4b8939.pth", help="SAM checkpoint")
+    parser.add_argument("--bert_base_uncased_path", type=str, default="Grounded-Segment-Anything/bert-base-uncased/", help="bert-base-uncased path")
     parser.add_argument("--text_prompt", type=str, default="hand", help="Text prompt for hand detection")
     parser.add_argument("--box_threshold", type=float, default=0.3, help="Box threshold")
     parser.add_argument("--text_threshold", type=float, default=0.25, help="Text threshold")
     parser.add_argument("--device", type=str, default="cuda", help="Device (cpu or cuda)")
-    parser.add_argument("--credentials", type=str, required=True, help="OpenAI/Azure credentials .env file")
+    parser.add_argument("--credentials", type=str, default="auth.env", help="OpenAI/Azure credentials .env file")
     parser.add_argument("--action", type=str, default="Grasping the object", help="Action label")
     parser.add_argument("--grid_size", type=int, default=3, help="Grid size for localization")
     parser.add_argument("--max_feedbacks", type=int, default=1, help="Maximum feedback loops")
+    parser.add_argument("--vlm_input_dir", type=str, default=None, help="Directory for debug images sent to the VLM")
     args = parser.parse_args()
+
+    args.video_path = os.path.abspath(os.path.expanduser(args.video_path))
+    args.output_dir = os.path.abspath(os.path.expanduser(args.output_dir or default_output_dir(args.video_path)))
+    args.config = resolve_egoloc_path(os.path.expanduser(args.config))
+    args.grounded_checkpoint = resolve_egoloc_path(os.path.expanduser(args.grounded_checkpoint))
+    args.sam_checkpoint = resolve_egoloc_path(os.path.expanduser(args.sam_checkpoint))
+    args.bert_base_uncased_path = resolve_egoloc_path(os.path.expanduser(args.bert_base_uncased_path))
+    args.credentials = resolve_egoloc_path(os.path.expanduser(args.credentials))
+
+    VLM_INPUT_DIR = os.path.abspath(os.path.expanduser(args.vlm_input_dir or os.path.join(args.output_dir, "vlm_inputs")))
+
     os.makedirs(args.output_dir, exist_ok=True)
     # 1. 2D hand velocity extraction and visualize
     print("\n [1/3] Extracting 2D hand speed and visualizing ...")

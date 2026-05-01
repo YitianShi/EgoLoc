@@ -1,0 +1,4 @@
+auth.env
+__pycache__/
+*.py[cod]
+.codex
