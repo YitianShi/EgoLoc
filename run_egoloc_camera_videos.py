@@ -186,6 +186,16 @@ def copy_summary(result_path, summary_path):
     print(f"[EgoLoc] Contact summary saved: {summary_path}")
 
 
+def clear_old_egoloc_files(paths, dry_run=False):
+    for path in paths:
+        if dry_run:
+            print(f"rm -f {shlex.quote(str(path))}")
+            continue
+        if path.is_file():
+            path.unlink()
+            print(f"[EgoLoc] Removed old file: {path}")
+
+
 def build_egoloc_command(args, video_path, output_dir, speed_json):
     command = [
         args.python,
@@ -236,6 +246,7 @@ def run_video(args, video_path, output_dir):
     result_path = output_dir / f"{video_name}_result.json"
     summary_path = default_summary_path(output_dir, args.summary_filename)
     raw_speed_json = resolve_speed_json(args, video_path, output_dir)
+    old_egoloc_files = [result_path, summary_path]
 
     print()
     print(f"===== EgoLoc long: {video_path} =====")
@@ -246,9 +257,15 @@ def run_video(args, video_path, output_dir):
     else:
         print("[EgoLoc] No precomputed speed JSON found; EgoLoc will compute speed from video.")
 
-    if not args.overwrite and result_path.is_file():
+    if args.clear_old_egoloc_file:
+        clear_old_egoloc_files(old_egoloc_files, dry_run=args.dry_run)
+
+    if not args.clear_old_egoloc_file and not args.overwrite and result_path.is_file():
         print(f"[EgoLoc] Existing result, skipping: {result_path}")
-        copy_summary(result_path, summary_path)
+        if args.dry_run:
+            print(f"cp {shlex.quote(str(result_path))} {shlex.quote(str(summary_path))}")
+        else:
+            copy_summary(result_path, summary_path)
         return
 
     speed_json = normalize_speed_json_for_long_runner(
@@ -317,6 +334,12 @@ def parse_args():
     parser.add_argument("--grid-size", type=int, default=int(env_default("GRID_SIZE", "2")))
     parser.add_argument("--max-feedbacks", type=int, default=int(env_default("MAX_FEEDBACKS", "1")))
     parser.add_argument("--overwrite", action="store_true", default=env_default("OVERWRITE", "0") == "1")
+    parser.add_argument(
+        "--clear-old-egoloc-file",
+        action="store_true",
+        default=env_default("CLEAR_OLD_EGOLOC_FILE", "0") == "1",
+        help="remove the existing EgoLoc result and summary for each video before running",
+    )
     parser.add_argument("--dry-run", action="store_true", default=env_default("DRY_RUN", "0") == "1")
     parser.add_argument(
         "--continue-on-error",

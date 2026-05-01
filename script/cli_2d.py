@@ -227,7 +227,7 @@ def main():
     
     # Step 2: Temporal localization
     print("\n[Step 2/3] Locating contact/separation frames...")
-    use_vda = (not args.speed_json) and (args.video_type == "long")
+    use_vda = True
     pairs = convert_video(
         args.video_path,
         credentials,
