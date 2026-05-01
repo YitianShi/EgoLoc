@@ -49,6 +49,21 @@ def default_output_dir(video_path):
         return os.path.join(video_dir, "egoloc")
     return os.path.join(video_dir, "egoloc_output")
 
+
+def load_credentials(credentials_path):
+    """Load credentials from environment variables first, then auth.env."""
+    credentials = dict(dotenv.dotenv_values(credentials_path))
+    for key in (
+        "OPENAI_API_KEY",
+        "AZURE_OPENAI_API_KEY",
+        "AZURE_OPENAI_ENDPOINT",
+        "AZURE_OPENAI_DEPLOYMENT_NAME",
+    ):
+        env_value = os.environ.get(key)
+        if env_value:
+            credentials[key] = env_value
+    return credentials
+
 def load_model(model_config_path, model_checkpoint_path, bert_base_uncased_path, device):
     """
     Build and load a GroundingDINO model.
@@ -917,8 +932,11 @@ def scene_understanding(credentials, frame, prompt_message, flag=None):
     ]
     import openai
     from openai import OpenAI
+    api_key = credentials.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is required in the environment or credentials file.")
     client_gpt4v = OpenAI(
-        api_key=credentials["OPENAI_API_KEY"]
+        api_key=api_key
     )
     params = {
         "model": "gpt-4o",
@@ -1232,7 +1250,7 @@ if __name__ == "__main__":
 
     # 2. Temporal interaction localization
     print("\n [2/3] Locating contact/separation frames and visualizing ...")
-    credentials = dotenv.dotenv_values(args.credentials)
+    credentials = load_credentials(args.credentials)
     frame_contact, frame_separate = convert_video(
         args.video_path, args.action, credentials, args.grid_size, args.output_dir, args.max_feedbacks, repeat_times=3
     )
