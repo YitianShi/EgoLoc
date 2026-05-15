@@ -1,3 +1,83 @@
-numpy==1.22.3
+# EgoLoc environment manifest.
+# Use ./install_all_thirdparty.sh for a full install: it creates/uses the
+# egoloc conda env and installs this file in phases so PyTorch-dependent source
+# builds can see the active environment.
+
+# Core EgoLoc runtime
+numpy>=1.23,<2
+torch==2.4.0
+torchvision==0.19.0
+opencv-python>=4.8,<4.12
+Pillow>=10
+matplotlib>=3.7,<3.8
+scipy>=1.10
+open3d>=0.18
 openai==1.57.1
 python-dotenv==1.0.1
+anyio
+sniffio
+tqdm
+urllib3
+protobuf
+click
+joblib
+aiohttp
+ftfy
+
+# Grounded-Segment-Anything / GroundingDINO
+addict
+diffusers
+gradio
+huggingface_hub
+onnxruntime
+pycocotools
+PyYAML
+requests
+setuptools<81
+supervision
+termcolor
+timm==0.4.12
+transformers==4.25.1
+yapf
+nltk
+fairscale==0.4.4
+litellm<1.60
+-e ./Grounded-Segment-Anything/segment_anything
+-e ./Grounded-Segment-Anything/GroundingDINO
+
+# HaMeR / ViTPose
+gdown
+pyrender
+pytorch-lightning
+scikit-image
+smplx==0.1.28
+yacs
+einops
+xtcocotools
+pandas
+hydra-core
+hydra-submitit-launcher
+hydra-colorlog
+pyrootutils
+rich
+webdataset
+yacs
+mmcv==1.3.9
+detectron2 @ git+https://github.com/facebookresearch/detectron2
+chumpy @ git+https://github.com/mattloper/chumpy
+-e ./hamer
+-e ./hamer/third-party/ViTPose
+
+# Recognize Anything
+pycocoevalcap
+clip @ git+https://github.com/openai/CLIP.git
+-e ./recognize-anything
+
+# Video-Depth-Anything without its conflicting torch/numpy pins
+imageio==2.37.0
+imageio-ffmpeg==0.4.7
+decord
+einops==0.4.1
+easydict
+tqdm
+OpenEXR==3.3.1
