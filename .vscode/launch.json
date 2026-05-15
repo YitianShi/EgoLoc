@@ -12,10 +12,6 @@
             "program": "${file}",
             "python": "/home/yitian/anaconda3/envs/egoloc/bin/python",
             "console": "integratedTerminal",
-            "env": {
-                "PYTHONNOUSERSITE": "1",
-                "MPLCONFIGDIR": "/tmp/egoloc-matplotlib"
-            }
         },
         {
             "name": "Run egoloc camera",
@@ -28,28 +24,31 @@
             ],
             "django": true,
             "console": "integratedTerminal",
-            "env": {
-                "PYTHONNOUSERSITE": "1",
-                "MPLCONFIGDIR": "/tmp/egoloc-matplotlib"
-            }
         },
         {
             "name": "Run egoloc long 2d",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/egoloc2d_long.py",
-            "python": "/home/yitian/anaconda3/envs/egoloc/bin/python",
             "args": [
-                "--video_path", "ManiTIL/cabinet/video/video1.mp4 ",
+                "--video_path", "ManiTIL/cabinet/video/video1.mp4",
                 "--speed_json", "ManiTIL/cabinet/speed/video1_speed.json",
                 "--video_type", "long"
             ],
             "django": true,
             "console": "integratedTerminal",
-            "env": {
-                "PYTHONNOUSERSITE": "1",
-                "MPLCONFIGDIR": "/tmp/egoloc-matplotlib"
-            }
+        },
+        {
+            "name": "Run egoloc long 3d",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/egoloc3d_long.py",
+            "args": [
+                "--video_path", "ManiTIL/cabinet/video/video1.mp4",
+                "--video_type", "long"
+            ],
+            "django": true,
+            "console": "integratedTerminal",
         }
     ]
 }
