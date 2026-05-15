@@ -7,7 +7,7 @@
 numpy>=1.23,<2
 torch==2.4.0
 torchvision==0.19.0
-opencv-python>=4.8,<4.12
+opencv-python-headless>=4.8,<4.12
 Pillow>=10
 matplotlib>=3.7,<3.8
 python-dateutil
@@ -43,8 +43,6 @@ yapf
 nltk
 fairscale==0.4.4
 litellm<1.60
--e ./Grounded-Segment-Anything/segment_anything
--e ./Grounded-Segment-Anything/GroundingDINO
 
 # HaMeR / ViTPose
 gdown
@@ -82,3 +80,4 @@ easydict
 tqdm
 OpenEXR==3.3.1
 imageio[ffmpeg]
+webdataset

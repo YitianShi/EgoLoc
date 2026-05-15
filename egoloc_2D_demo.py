@@ -6,12 +6,16 @@ import json
 import torch
 from PIL import Image
 import cv2
-import matplotlib.pyplot as plt
+import matplotlib
 import dotenv
 import base64
 import math
 import time
 import warnings
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 

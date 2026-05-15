@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import cv2
-import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from .config import Config
 from .depth_estimation import generate_depth_video_vda
@@ -279,4 +282,3 @@ def convert_video(
     pairs = get_contact_separation_pairs(results, speed_list, video_type)
     
     return pairs
-

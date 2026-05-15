@@ -24,11 +24,14 @@ import open3d as o3d
 
 import cv2
 import dotenv  # read .env creds for GPT-4o
-import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 from scipy import ndimage  # connected‑component helper
 from scipy.ndimage import gaussian_filter1d
 from typing import List, Dict, Tuple, Optional, Any
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 try:
     import torch
@@ -55,7 +58,6 @@ except ImportError as e:
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
-plt.switch_backend("Agg")  # headless plotting
 
 # ---------------------------------------------------------------------------
 # Helper – unpack Video‑Depth‑Anything *_depths.npz → per‑frame .npy
