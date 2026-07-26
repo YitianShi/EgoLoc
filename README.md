@@ -12,7 +12,7 @@
 
 📄 [Read our paper](https://arxiv.org/abs/2506.03662) – accepted at **IROS 2025**.
 
-📄 [Extended journal version](https://arxiv.org/abs/2508.12349) for more details.
+📄 [Extended journal version](https://arxiv.org/abs/2508.12349) for more details  – accepted at **T-PAMI 2026**.
 
 📣 We have released the extended version of EgoLoc for long untrimmed videos. Feel free to use it!
 
