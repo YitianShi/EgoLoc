@@ -12,19 +12,19 @@
 
 📄 [Read our paper](https://arxiv.org/abs/2506.03662) – accepted at **IROS 2025**.
 
-📄 [Extended journal version](https://arxiv.org/abs/2508.12349) for more details.
+📄 [Extended journal version](https://arxiv.org/abs/2508.12349) for more details  – accepted at **T-PAMI 2026**.
 
 📣 We have released the extended version of EgoLoc for long untrimmed videos. Feel free to use it!
 
 
 <div align="center">
  <h3>
- from <font color="blue">[🧭TAL]</font> to <font color="red">[🎯TIL]</font>
+ ✦✦✦ <font color="blue">🧭 TAL</font> → <font color="red">🎯 TIL</font> ✦✦✦
  </h3>
  <img src="TAL_TIL.png" alt="TAL to TIL Diagram" width="70%" />
 </div>
 
-We greatly appreciate [Yuchen Xie](https://github.com/yuchenxie4645) for helping organize our repository and developing VDA-based version.
+We greatly appreciate [Yuchen Xie](https://github.com/yuchenxie4645) for organizing our repository and helping develop [VDA-based & bimanual extension](https://pan.sjtu.edu.cn/web/share/d8e2b69ef5ae66fe00c686783ae011b8).
 
 ---
 
@@ -254,11 +254,19 @@ python egoloc3d_long.py  --video_path ManiTIL/cabinet/video/video1.mp4  --video_
 
 * The example long videos in our ManiTIL benchmark are available [here](https://pan.sjtu.edu.cn/web/share/6ba9a6b6d8f9161c75d5029f5d997726). Please download and unzip to the `./ManiTIL/` directory.
 
-* This is the initial release of extended EgoLoc for long videos. We are still in the process of cleaning, refactoring, and documenting the updated codebase and benchmarks. We plan to complete all updates in the following several months. **We appreciate your interest and patience. For now, feel free to use EgoLoc in your own projects!**
+* This is the initial release of extended EgoLoc for long videos. We are still in the process of cleaning, refactoring, and documenting the updated codebase and benchmarks. We plan to complete all updates in the following several months. 
 
 ---
 
-## 4. Citation
+## 4. Datasets
+
+We provide some test video samples from [EgoPAT3D](https://pan.sjtu.edu.cn/web/share/a3b27a7d80cd6826aeaeed8cc71b5da8), [DeskTIL](https://pan.sjtu.edu.cn/web/share/9c552393f367cfb9290c8ac890ed0c59), and [ManiTIL](https://pan.sjtu.edu.cn/web/share/d19651d896a6e78081d46e87cf149ebc) datasets, along with our manual annotations, for evaluating TIL methods. Feel free to use them!
+
+We will release more annotated data in the future.
+
+---
+
+## 5. Citation
 
 🙏 If you find EgoLoc useful in your research, please consider citing:
 
